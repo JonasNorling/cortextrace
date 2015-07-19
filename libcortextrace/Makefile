@@ -1,23 +1,55 @@
 BUILDDIR = build
 
-SRCS += src/libcortextrace.cpp
-OBJS := $(SRCS:%.cpp=$(BUILDDIR)/%.o)
+LIB_SRCS += src/log.cpp
+LIB_SRCS += src/TraceEvent.cpp
+LIB_SRCS += src/TraceEventListener.cpp
+LIB_SRCS += src/TraceFileParser.cpp
 
-CFLAGS += -Werror -Wall -Wpedantic -std=c++11 -g -O1
-CPPFLAGS += -Iinclude/
+LIB_OBJS := $(LIB_SRCS:%.cpp=$(BUILDDIR)/%.o)
+
+OBJS += $(LIB_OBJS)
+
+CFLAGS += -Werror -Wall -Wpedantic -Weffc++ -std=c++11 -g -O1
+CPPFLAGS += -Iinclude/ -Isrc/
+
+.PHONY: all
+all: $(BUILDDIR)/libcortextrace.a tools
+
+# ---------------------------------------------------------------------
+
+.PHONY: test
+test: $(BUILDDIR)/testTraceFileParser
+	$(BUILDDIR)/testTraceFileParser
+ 
+OBJS += $(BUILDDIR)/src/test/TestTraceFileParser.o
+$(BUILDDIR)/testTraceFileParser: $(BUILDDIR)/src/test/TestTraceFileParser.o $(BUILDDIR)/libcortextrace.a
+	@echo CXX $<
+	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace
+
+# ---------------------------------------------------------------------
+
+.PHONY: tools
+tools: $(BUILDDIR)/cortextrace
+
+OBJS += $(BUILDDIR)/tools/cortextrace.o
+$(BUILDDIR)/cortextrace: $(BUILDDIR)/tools/cortextrace.o $(BUILDDIR)/libcortextrace.a
+	@echo CXX $@
+	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace
+
+
+# ---------------------------------------------------------------------
 
 DEPFILES := $(patsubst %.o,%.d,$(OBJS))
 -include $(DEPFILES)
 
-all: $(BUILDDIR)/libcortextrace.a
 
-$(BUILDDIR)/libcortextrace.a: $(OBJS) Makefile
-	$(AR) cr $@ $(OBJS)
+$(BUILDDIR)/libcortextrace.a: $(LIB_OBJS) Makefile
+	$(AR) cr $@ $(LIB_OBJS)
 
 $(BUILDDIR)/%.o: %.cpp Makefile
-	@echo CC $<
+	@echo CXX $<
 	@mkdir -p $(dir $@)
-	@$(CC) -MMD -MP $(CPPFLAGS) $(CFLAGS) $(CCFLAGS) -c -o $@ $<
+	@$(CXX) -MMD -MP $(CPPFLAGS) $(CFLAGS) $(CCFLAGS) -c -o $@ $<
 
 clean:
 	rm -rf $(BUILDDIR)
