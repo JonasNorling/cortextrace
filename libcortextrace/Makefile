@@ -1,6 +1,8 @@
 BUILDDIR = build
 
 LIB_SRCS += src/log.cpp
+LIB_SRCS += src/GdbConnection.cpp
+LIB_SRCS += src/GdbConnectionState.cpp
 LIB_SRCS += src/TraceEvent.cpp
 LIB_SRCS += src/TraceEventListener.cpp
 LIB_SRCS += src/TraceFileParser.cpp
@@ -10,7 +12,7 @@ LIB_OBJS := $(LIB_SRCS:%.cpp=$(BUILDDIR)/%.o)
 OBJS += $(LIB_OBJS)
 
 CFLAGS += -Werror -Wall -Wpedantic -Weffc++ -std=c++11 -g -O1
-CPPFLAGS += -Iinclude/ -Isrc/
+CPPFLAGS += -Iinclude/ -Isrc/ -I3pp/
 
 .PHONY: all
 all: $(BUILDDIR)/libcortextrace.a tools
@@ -29,19 +31,24 @@ $(BUILDDIR)/testTraceFileParser: $(BUILDDIR)/src/test/TestTraceFileParser.o $(BU
 # ---------------------------------------------------------------------
 
 .PHONY: tools
-tools: $(BUILDDIR)/cortextrace
+tools: $(BUILDDIR)/cortextrace $(BUILDDIR)/cortexwatch
 
 OBJS += $(BUILDDIR)/tools/cortextrace.o
 $(BUILDDIR)/cortextrace: $(BUILDDIR)/tools/cortextrace.o $(BUILDDIR)/libcortextrace.a
 	@echo CXX $@
 	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace
 
+OBJS += $(BUILDDIR)/tools/cortexwatch.o
+$(BUILDDIR)/cortexwatch: $(BUILDDIR)/tools/cortexwatch.o $(BUILDDIR)/libcortextrace.a $(BUILDDIR)/libmi.so
+	@echo CXX $@
+	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace -lmi
+
 # ---------------------------------------------------------------------
 
 $(BUILDDIR)/libmi.so:
 	mkdir -p $(BUILDDIR)/libmi
 	cd $(BUILDDIR)/libmi && ../../3pp/libmi/configure
-	$(MAKE) -C $(BUILDDIR)/libmi/
+	$(MAKE) -j1 -C $(BUILDDIR)/libmi/
 	cp $(BUILDDIR)/libmi/.libs/libmi.so $@
 	touch $@
 
@@ -50,6 +57,9 @@ $(BUILDDIR)/libmi.so:
 DEPFILES := $(patsubst %.o,%.d,$(OBJS))
 -include $(DEPFILES)
 
+
+# mi_gdb.h doesn't pass all GCC's pedantery
+#$(BUILDDIR)/src/GdbConnection.o: CCFLAGS += -Wno-pedantic -Wno-effc++
 
 $(BUILDDIR)/libcortextrace.a: $(LIB_OBJS) Makefile
 	$(AR) cr $@ $(LIB_OBJS)
