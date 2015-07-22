@@ -36,6 +36,14 @@ $(BUILDDIR)/cortextrace: $(BUILDDIR)/tools/cortextrace.o $(BUILDDIR)/libcortextr
 	@echo CXX $@
 	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace
 
+# ---------------------------------------------------------------------
+
+$(BUILDDIR)/libmi.so:
+	mkdir -p $(BUILDDIR)/libmi
+	cd $(BUILDDIR)/libmi && ../../3pp/libmi/configure
+	$(MAKE) -C $(BUILDDIR)/libmi/
+	cp $(BUILDDIR)/libmi/.libs/libmi.so $@
+	touch $@
 
 # ---------------------------------------------------------------------
 
