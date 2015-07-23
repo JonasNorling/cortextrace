@@ -145,14 +145,27 @@ bool TraceFileParser::Parse()
 
 bool TraceFileParser::ParseSync()
 {
-	uint8_t data[6];
-	bool ok = GetData(data, sizeof(data));
+	uint8_t data[6] = { 0x00 };
+	bool ok = GetData(&data[1], 5);
 
 	if (!ok) {
 		return false;
 	}
 
-	// LOG_DEBUG("SYNC");
+	// LOG_DEBUG("SYNC?");
+	for (int i = 0; i < 5; i++) {
+		if (data[i] != 0x00) {
+			// LOG_DEBUG("Broken SYNC");
+			PutBackData(5);
+			return true;
+		}
+	}
+	if (data[5] != 0x00) {
+		// LOG_DEBUG("Broken SYNC 2");
+		PutBackData(5);
+		return true;
+	}
+
 	TraceEvent e(TraceEvent::TRACE_EVENT_SYNC);
 	Listener.HandleTraceEvent(e);
 
@@ -239,7 +252,6 @@ bool TraceFileParser::ParseHardwareSource(uint8_t b)
 			(data[1] << 8) |
 			(data[0]);
 
-	// LOG_DEBUG("HW event len %lu on port %u: %#x", len, b >> 3, intvalue);
 	TraceEvent e(TraceEvent::TRACE_EVENT_HW, b, intvalue);
 	Listener.HandleTraceEvent(e);
 

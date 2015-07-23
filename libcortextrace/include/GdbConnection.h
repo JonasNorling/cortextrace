@@ -16,7 +16,10 @@ public:
 	void EnableTpiu();
 	void Run();
 
+	uint32_t ReadWord(std::string expression, uint32_t* outAddress = NULL);
 	uint32_t ReadWord(uint32_t address);
+	uint32_t ResolveAddress(std::string expression);
+	bool WriteWord(uint32_t address, uint32_t value);
 
 protected:
 	std::unique_ptr<GdbConnectionState> State;

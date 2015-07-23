@@ -115,6 +115,11 @@ void GdbConnection::EnableTpiu()
 	LOG_INFO("TPIU_ACPR: 0x%08x", ReadWord(0xe0040010));
 	LOG_INFO("TPIU_SPPR: 0x%08x", ReadWord(0xe00400f0));
 	LOG_INFO("TPIU_TYPE: 0x%08x", ReadWord(0xe0040fc8));
+
+	LOG_INFO("DWT_CTRL: 0x%08x", ReadWord(0xe0001000));
+	LOG_INFO("DWT_COMP[0]: 0x%08x", ReadWord(0xe0001020));
+	LOG_INFO("DWT_MASK[0]: 0x%08x", ReadWord(0xe0001024));
+	LOG_INFO("DWT_FUNCTION[0]: 0x%08x", ReadWord(0xe0001028));
 }
 
 void GdbConnection::Run()
@@ -124,21 +129,34 @@ void GdbConnection::Run()
 	State->SyncCommand(cmd);
 }
 
+uint32_t GdbConnection::ResolveAddress(std::string expression)
+{
+	uint32_t addr = 0;
+	ReadWord(expression, &addr);
+	// LOG_DEBUG("%s resolves to %#x", expression.c_str(), addr);
+	return addr;
+}
+
 uint32_t GdbConnection::ReadWord(uint32_t address)
 {
 	char adrstring[16];
 	sprintf(adrstring, "%#x", address);
+	return ReadWord(adrstring);
+}
 
-	GdbCommand cmd(MIDataReadMemory(0, adrstring, const_cast<char*>("u"), 4, 1, 1, NULL));
+uint32_t GdbConnection::ReadWord(std::string expression, uint32_t* outAddress)
+{
+	GdbCommand cmd(MIDataReadMemory(0, const_cast<char*>(expression.c_str()),
+			const_cast<char*>("u"), 4, 1, 1, NULL));
 	bool cmdres = State->SyncCommand(cmd);
 	if (!cmdres) {
 		return 0;
 	}
 
 	MIResultRecord* res = MICommandResult(cmd);
-	MIString* mistr = MIResultRecordToString(res);
+	// MIString* mistr = MIResultRecordToString(res);
 	// LOG_DEBUG("Read word: %s", MIStringToCString(mistr));
-	MIStringFree(mistr);
+	// MIStringFree(mistr);
 
 	uint32_t value = 0;
 	MIResult* r;
@@ -160,21 +178,41 @@ uint32_t GdbConnection::ReadWord(uint32_t address)
 			assert(row->results);
 			MIResult* item;
 			for (MIListSet(row->results); (item = static_cast<MIResult*>(MIListGet(row->results)));) {
-				if (std::string("data") != item->variable || item->value->type != MIValueTypeList) {
-					continue;
+				if (std::string("addr") == item->variable) {
+					assert(item->value->cstring);
+					if (outAddress) {
+						*outAddress = strtol(item->value->cstring, NULL, 0);
+					}
 				}
 
-				MIValue* dataItem;
-				for (MIListSet(item->value->values); (dataItem = static_cast<MIValue*>(MIListGet(item->value->values)));) {
-					assert(dataItem->type == MIValueTypeConst);
-					value = atoi(dataItem->cstring);
-					// LOG_DEBUG("Data value: %s", dataItem->cstring);
+				if (std::string("data") == item->variable && item->value->type == MIValueTypeList) {
+					MIValue* dataItem;
+					for (MIListSet(item->value->values); (dataItem = static_cast<MIValue*>(MIListGet(item->value->values)));) {
+						assert(dataItem->type == MIValueTypeConst);
+						value = atoi(dataItem->cstring);
+						// LOG_DEBUG("Data value: %s", dataItem->cstring);
+					}
 				}
 			}
 		}
 	}
 
 	return value;
+}
+
+bool GdbConnection::WriteWord(uint32_t address, uint32_t value)
+{
+	char adrstring[16];
+	sprintf(adrstring, "%#x", address);
+	char datastring[16];
+	uint32_t levalue = ((value >> 24) & 0xff) |
+			((value >> 8) & 0xff00) |
+			((value << 8) & 0xff0000) |
+			((value << 24) & 0xff000000);
+	sprintf(datastring, "%08x", levalue);
+
+	GdbCommand cmd(MIDataWriteMemoryBytes(adrstring, datastring));
+	return State->SyncCommand(cmd);
 }
 
 } // namespace
