@@ -20,6 +20,7 @@ public:
 	uint32_t ReadWord(uint32_t address);
 	uint32_t ResolveAddress(std::string expression);
 	bool WriteWord(uint32_t address, uint32_t value);
+	std::string Evaluate(std::string expression);
 
 protected:
 	std::unique_ptr<GdbConnectionState> State;

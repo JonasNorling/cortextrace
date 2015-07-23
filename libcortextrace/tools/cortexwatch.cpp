@@ -63,11 +63,15 @@ int CortexWatch::Run(std::istream& input)
 	gdb.Connect("/usr/bin/arm-none-eabi-gdb",
 			"/home/jonas/workspace/knobbox/fw/build/knobbox.elf");
 	gdb.EnableTpiu();
-	uint32_t watch = gdb.ResolveAddress("&Controllers.ActiveKnob");
-	gdb.WriteWord(0xe0001020, watch); // DWT_COMP[0]
+
+	std::string variable = "Controllers.ActiveKnob";
+	const size_t size = std::stoul(gdb.Evaluate(std::string("sizeof(") + variable + ")"));
+
+	uint32_t addr = gdb.ResolveAddress("&Controllers.ActiveKnob");
+	gdb.WriteWord(0xe0001020, addr); // DWT_COMP[0]
 	gdb.WriteWord(0xe0001024, 2); // DWT_MASK[0]
 	gdb.WriteWord(0xe0001028, 0x3); // DWT_FUNCTION[0]
-	LOG_INFO("Watching %#x", watch);
+	LOG_INFO("Watching %s at %#x, size %lu", variable.c_str(), addr, size);
 	gdb.Run();
 
 	while (!input.eof()) {

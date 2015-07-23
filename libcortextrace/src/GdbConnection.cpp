@@ -129,6 +129,23 @@ void GdbConnection::Run()
 	State->SyncCommand(cmd);
 }
 
+std::string GdbConnection::Evaluate(std::string expression)
+{
+	std::string output;
+	GdbCommand cmd(MIDataEvaluateExpression(const_cast<char*>(expression.c_str())));
+	bool cmdres = State->SyncCommand(cmd);
+	if (cmdres) {
+		GdbResult r(cmd.Result());
+		try {
+			output = r["value"].Str();
+		}
+		catch (std::out_of_range &e) {
+			LOG_ERROR("%s", e.what());
+		}
+	}
+	return output;
+}
+
 uint32_t GdbConnection::ResolveAddress(std::string expression)
 {
 	uint32_t addr = 0;
@@ -153,50 +170,17 @@ uint32_t GdbConnection::ReadWord(std::string expression, uint32_t* outAddress)
 		return 0;
 	}
 
-	MIResultRecord* res = MICommandResult(cmd);
+	// MIResultRecord* res = MICommandResult(cmd);
 	// MIString* mistr = MIResultRecordToString(res);
 	// LOG_DEBUG("Read word: %s", MIStringToCString(mistr));
 	// MIStringFree(mistr);
 
-	uint32_t value = 0;
-	MIResult* r;
-	for (MIListSet(res->results); (r = static_cast<MIResult*>(MIListGet(res->results)));) {
-		if (std::string("memory") != r->variable) {
-			continue;
-		}
-		if (r->value->type != MIValueTypeList) {
-			LOG_WARNING("Weird memory dump");
-			continue;
-		}
+	GdbResult r(cmd.Result());
 
-		MIValue* row;
-		for (MIListSet(r->value->values); (row = static_cast<MIValue*>(MIListGet(r->value->values)));) {
-			if (row->type != MIValueTypeTuple) {
-				continue;
-			}
-
-			assert(row->results);
-			MIResult* item;
-			for (MIListSet(row->results); (item = static_cast<MIResult*>(MIListGet(row->results)));) {
-				if (std::string("addr") == item->variable) {
-					assert(item->value->cstring);
-					if (outAddress) {
-						*outAddress = strtol(item->value->cstring, NULL, 0);
-					}
-				}
-
-				if (std::string("data") == item->variable && item->value->type == MIValueTypeList) {
-					MIValue* dataItem;
-					for (MIListSet(item->value->values); (dataItem = static_cast<MIValue*>(MIListGet(item->value->values)));) {
-						assert(dataItem->type == MIValueTypeConst);
-						value = atoi(dataItem->cstring);
-						// LOG_DEBUG("Data value: %s", dataItem->cstring);
-					}
-				}
-			}
-		}
+	if (outAddress) {
+		*outAddress = strtol(r["addr"].Str().c_str(), NULL, 0);
 	}
-
+	const uint32_t value = atoi(r["memory"][0]["data"][0].Str().c_str());
 	return value;
 }
 
