@@ -47,7 +47,7 @@ AC_FUNC_FORK
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_STRTOD
-AC_CHECK_FUNCS([dup2 memset select strchr strdup strerror strstr strtol])
+AC_CHECK_FUNCS([prctl dup2 memset select strchr strdup strerror strstr strtol])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

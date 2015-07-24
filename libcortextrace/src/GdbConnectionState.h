@@ -1,9 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <stdexcept>
+#include <string>
 #include <unordered_map>
 #include <vector>
-#include <stdexcept>
 
 extern "C" {
 #define class ClassRedefined
@@ -16,8 +17,7 @@ namespace lct {
 
 class GdbResult {
 public:
-	//GdbResult(const GdbResult& o) = default;
-
+	GdbResult(GdbResult&& o) = default;
 	static GdbResult FromResultRecord(MIResultRecord* rr);
 	static GdbResult FromList(MIList* list);
 	static GdbResult FromTuple(MIList* tuple);

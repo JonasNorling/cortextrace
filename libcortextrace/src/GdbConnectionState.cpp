@@ -51,8 +51,7 @@ GdbCommand::operator MICommand*()
 
 GdbResult GdbCommand::Result()
 {
-	GdbResult r(GdbResult::FromResultRecord(MICommandResult(Cmd)));
-	return r;
+	return GdbResult::FromResultRecord(MICommandResult(Cmd));
 }
 
 GdbResult::GdbResult() :

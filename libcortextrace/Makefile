@@ -14,6 +14,12 @@ OBJS += $(LIB_OBJS)
 CFLAGS += -Werror -Wall -Wpedantic -Weffc++ -std=c++11 -g -O1
 CPPFLAGS += -Iinclude/ -Isrc/ -I3pp/
 
+ifeq ($(shell uname), Darwin)
+LIBMI := libmi.dylib
+else
+LIBMI := libmi.so
+endif
+
 .PHONY: all
 all: $(BUILDDIR)/libcortextrace.a tools
 
@@ -39,17 +45,18 @@ $(BUILDDIR)/cortextrace: $(BUILDDIR)/tools/cortextrace.o $(BUILDDIR)/libcortextr
 	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace
 
 OBJS += $(BUILDDIR)/tools/cortexwatch.o
-$(BUILDDIR)/cortexwatch: $(BUILDDIR)/tools/cortexwatch.o $(BUILDDIR)/libcortextrace.a $(BUILDDIR)/libmi.so
+$(BUILDDIR)/cortexwatch: $(BUILDDIR)/tools/cortexwatch.o $(BUILDDIR)/libcortextrace.a $(BUILDDIR)/$(LIBMI)
 	@echo CXX $@
 	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace -lmi
 
 # ---------------------------------------------------------------------
 
-$(BUILDDIR)/libmi.so:
+$(BUILDDIR)/$(LIBMI):
+	echo Building $(LIBMI)
 	mkdir -p $(BUILDDIR)/libmi
 	cd $(BUILDDIR)/libmi && ../../3pp/libmi/configure
 	$(MAKE) -j1 -C $(BUILDDIR)/libmi/
-	cp $(BUILDDIR)/libmi/.libs/libmi.so $@
+	cp $(BUILDDIR)/libmi/.libs/$(LIBMI) $@
 	touch $@
 
 # ---------------------------------------------------------------------

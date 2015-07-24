@@ -24,7 +24,9 @@
 #include	<config.h>
 #endif /* HAVE_CONFIG_H */
 
+#ifdef HAVE_PRCTL
 #include <sys/prctl.h>
+#endif
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/errno.h>
@@ -197,7 +199,9 @@ MISessionStartLocal(MISession *sess, char *prog)
 	{
 	case 0:
 		// set parent death signal to send SIGTERM
+#ifdef HAVE_PRCTL
 		prctl(PR_SET_PDEATHSIG, SIGTERM);
+#endif
 	
 		dup2(p2[0], 0);
 		dup2(p1[1], 1);
