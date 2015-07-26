@@ -92,11 +92,11 @@ void GdbConnection::Connect(std::string gdb, std::string exec)
 	}
 }
 
-void GdbConnection::EnableTpiu()
+void GdbConnection::EnableTpiu(std::string logfile)
 {
 	{
 		const char* argv[] = { "monitor", "tpiu", "config", "internal",
-				"/tmp/tpiu.log", "uart", "off", "72000000" };
+				logfile.c_str(), "uart", "off", "72000000" };
 		GdbCommand cmd(CLIBypass(8, const_cast<char**>(argv)));
 		State->SyncCommand(cmd);
 	}
