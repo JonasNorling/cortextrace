@@ -7,6 +7,7 @@
 #include <vector>
 #include <thread>
 #include <fcntl.h>
+#include <cmath>
 
 #include "TraceEvent.h"
 #include "TraceEventListener.h"
@@ -125,19 +126,33 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
 	LOG_DEBUG("Enable TPIU");
 	gdb.EnableTpiu(TpiuPipe->GetName());
 
+	// Clear old watches
+	for (size_t comp = 0; comp < numcomp; comp++) {
+        const uint32_t regOfs = comp << 4;
+        gdb.WriteWord(0xe0001020 + regOfs, 0); // DWT_COMP[comp]
+        gdb.WriteWord(0xe0001024 + regOfs, 0); // DWT_MASK[comp]
+        gdb.WriteWord(0xe0001028 + regOfs, 0); // DWT_FUNCTION[comp]
+	}
+
+	// Set up new watches
 	size_t comp = 0;
 	for (auto expression : watch) {
 	    LOG_DEBUG("Setting watch");
 	    const size_t size = std::stoul(gdb.Evaluate(std::string("sizeof(") +
 	            expression + ")"));
-
 	    const uint32_t addr = gdb.ResolveAddress(std::string("&(") + expression + ")");
+
 	    const uint32_t regOfs = comp++ << 4;
+	    const size_t masksize = log2(size);
+	    if (1 << masksize != size) {
+	        LOG_WARNING("Cannot watch region of size %lu, rounding down to %lu",
+	                size, 1UL << masksize);
+	    }
 	    gdb.WriteWord(0xe0001020 + regOfs, addr); // DWT_COMP[comp]
-	    // FIXME: Write right mask
-	    gdb.WriteWord(0xe0001024 + regOfs, 2); // DWT_MASK[comp]
+	    gdb.WriteWord(0xe0001024 + regOfs, masksize); // DWT_MASK[comp]
 	    gdb.WriteWord(0xe0001028 + regOfs, 0x3); // DWT_FUNCTION[comp]
-	    LOG_INFO("Watching %s at %#x, size %lu", expression.c_str(), addr, size);
+	    LOG_INFO("Watching %s at %#x, size %lu (%lu bit mask)",
+	            expression.c_str(), addr, size, masksize);
 	}
 
 	gdb.Run();
