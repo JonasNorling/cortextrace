@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <cmath>
 
+#include "Registers.h"
 #include "TraceEvent.h"
 #include "TraceEventListener.h"
 #include "TraceFileParser.h"
@@ -103,6 +104,7 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
 
 	lct::GdbConnection gdb;
 	lct::TraceFileParser tfp(*this);
+	lct::Registers regs;
 
 	gdb.Connect(gdbPath, elfPath);
 	gdb.DisableTpiu();
@@ -128,10 +130,9 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
 
 	// Clear old watches
 	for (size_t comp = 0; comp < numcomp; comp++) {
-        const uint32_t regOfs = comp << 4;
-        gdb.WriteWord(0xe0001020 + regOfs, 0); // DWT_COMP[comp]
-        gdb.WriteWord(0xe0001024 + regOfs, 0); // DWT_MASK[comp]
-        gdb.WriteWord(0xe0001028 + regOfs, 0); // DWT_FUNCTION[comp]
+        gdb.WriteWord(regs.DWT_COMP[comp], 0);
+        gdb.WriteWord(regs.DWT_MASK[comp], 0);
+        gdb.WriteWord(regs.DWT_FUNCTION[comp], 0);
 	}
 
 	// Set up new watches
@@ -142,17 +143,17 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
 	            expression + ")"));
 	    const uint32_t addr = gdb.ResolveAddress(std::string("&(") + expression + ")");
 
-	    const uint32_t regOfs = comp++ << 4;
 	    const size_t masksize = log2(size);
 	    if (1 << masksize != size) {
 	        LOG_WARNING("Cannot watch region of size %lu, rounding down to %lu",
 	                size, 1UL << masksize);
 	    }
-	    gdb.WriteWord(0xe0001020 + regOfs, addr); // DWT_COMP[comp]
-	    gdb.WriteWord(0xe0001024 + regOfs, masksize); // DWT_MASK[comp]
-	    gdb.WriteWord(0xe0001028 + regOfs, 0x3); // DWT_FUNCTION[comp]
+	    gdb.WriteWord(regs.DWT_COMP[comp], addr);
+	    gdb.WriteWord(regs.DWT_MASK[comp], masksize);
+	    gdb.WriteWord(regs.DWT_FUNCTION[comp], 0x3);
 	    LOG_INFO("Watching %s at %#x, size %lu (%lu bit mask)",
 	            expression.c_str(), addr, size, masksize);
+	    comp++;
 	}
 
 	gdb.Run();

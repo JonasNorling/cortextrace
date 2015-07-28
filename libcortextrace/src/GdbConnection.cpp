@@ -5,6 +5,7 @@
 
 #include "GdbConnectionState.h"
 #include "log.h"
+#include "Registers.h"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -120,19 +121,30 @@ void GdbConnection::EnableTpiu(std::string logfile)
 		State->SyncCommand(cmd);
 	}
 
-	LOG_INFO("CPU ID: %#x", ReadWord(0xe000ed00));
-	LOG_INFO("DEMCR: 0x%08x", ReadWord(0xe000edfc));
-	LOG_INFO("ITM_TER0: 0x%08x", ReadWord(0xe0000e00));
-	LOG_INFO("ITM_TCR: 0x%08x", ReadWord(0xe0000e80));
-	LOG_INFO("TPIU_SSPSR: 0x%08x", ReadWord(0xe0040000));
-	LOG_INFO("TPIU_ACPR: 0x%08x", ReadWord(0xe0040010));
-	LOG_INFO("TPIU_SPPR: 0x%08x", ReadWord(0xe00400f0));
-	LOG_INFO("TPIU_TYPE: 0x%08x", ReadWord(0xe0040fc8));
+	Registers regs;
 
-	LOG_INFO("DWT_CTRL: 0x%08x", ReadWord(0xe0001000));
-	LOG_INFO("DWT_COMP[0]: 0x%08x", ReadWord(0xe0001020));
-	LOG_INFO("DWT_MASK[0]: 0x%08x", ReadWord(0xe0001024));
-	LOG_INFO("DWT_FUNCTION[0]: 0x%08x", ReadWord(0xe0001028));
+	const uint32_t cpuid = ReadWord(regs.CPUID);
+	const uint32_t partno = (cpuid >> 4) & 0xfff;
+	LOG_INFO("CPUID: %#x: %s %s%u r%up%u",
+	        cpuid,
+	        (cpuid >> 24) == 0x41 ? "ARM" : "unknown",
+	        (partno & 0xc30) == 0xc20 ? "Cortex-M" : "unknown",
+	        partno & 0x0f,
+	        (cpuid >> 20) & 0xf,
+	        cpuid & 0xf);
+
+	LOG_INFO("DEMCR: 0x%08x", ReadWord(regs.DEMCR));
+	LOG_INFO("ITM_TER0: 0x%08x", ReadWord(regs.ITM_TER0));
+	LOG_INFO("ITM_TCR: 0x%08x", ReadWord(regs.ITM_TCR));
+	LOG_INFO("TPIU_SSPSR: 0x%08x", ReadWord(regs.TPIU_SSPSR));
+	LOG_INFO("TPIU_ACPR: 0x%08x", ReadWord(regs.TPIU_ACPR));
+	LOG_INFO("TPIU_SPPR: 0x%08x", ReadWord(regs.TPIU_SPPR));
+	LOG_INFO("TPIU_TYPE: 0x%08x", ReadWord(regs.TPIU_TYPE));
+
+	LOG_INFO("DWT_CTRL: 0x%08x", ReadWord(regs.DWT_CTRL));
+	LOG_INFO("DWT_COMP[0]: 0x%08x", ReadWord(regs.DWT_COMP[0]));
+	LOG_INFO("DWT_MASK[0]: 0x%08x", ReadWord(regs.DWT_MASK[0]));
+	LOG_INFO("DWT_FUNCTION[0]: 0x%08x", ReadWord(regs.DWT_FUNCTION[0]));
 }
 
 void GdbConnection::Run()
