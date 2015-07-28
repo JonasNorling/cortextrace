@@ -3,8 +3,19 @@
 #include <cstdio>
 #include <cstdarg>
 #include <iostream>
+#include <sys/time.h>
 
 namespace lct {
+
+static const char* levelStr(LogLevel level)
+{
+    switch (level) {
+    case DEBUG: return "debug";
+    case INFO: return "info";
+    case WARNING: return "warning";
+    case ERROR: return "error";
+    }
+}
 
 void log(LogLevel level, const char* func, const char* format, ...)
 {
@@ -17,7 +28,11 @@ void log(LogLevel level, const char* func, const char* format, ...)
 
     va_end(args);
 
-    std::cerr << "--- " << func << ": " << buffer << std::endl;
+    struct timeval now;
+    gettimeofday(&now, NULL);
+
+    std::cerr << now.tv_sec << "." << now.tv_usec / 1000
+            << " [" << levelStr(level) << "] " << func << ": " << buffer << std::endl;
 }
 
 } /* namespace lct */

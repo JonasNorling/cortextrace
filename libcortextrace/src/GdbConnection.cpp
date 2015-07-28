@@ -6,6 +6,8 @@
 #include "GdbConnectionState.h"
 #include "log.h"
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
 namespace lct {
 
 GdbConnection::GdbConnection() :
@@ -77,7 +79,11 @@ void GdbConnection::Connect(std::string gdb, std::string exec)
 
 	LOG_DEBUG("Connected to GDB");
 
-	// FIXME: We may need to send -gdb-set mi-async 1
+	{
+	    GdbCommand cmd(MICommandNew(const_cast<char*>("-gdb-set mi-async"), MIResultRecordDONE));
+        MICommandAddOption(cmd, const_cast<char*>("1"), NULL);
+        State->SyncCommand(cmd);
+	}
 
 	{
 		GdbCommand cmd(MIGDBSet(const_cast<char*>("confirm"), const_cast<char*>("off")));
@@ -92,18 +98,25 @@ void GdbConnection::Connect(std::string gdb, std::string exec)
 	}
 }
 
+void GdbConnection::DisableTpiu()
+{
+    const char* argv[] = { "monitor", "tpiu", "config", "disable" };
+    GdbCommand cmd(CLIBypass(ARRAY_SIZE(argv), const_cast<char**>(argv)));
+    State->SyncCommand(cmd);
+}
+
 void GdbConnection::EnableTpiu(std::string logfile)
 {
 	{
 		const char* argv[] = { "monitor", "tpiu", "config", "internal",
 				logfile.c_str(), "uart", "off", "72000000" };
-		GdbCommand cmd(CLIBypass(8, const_cast<char**>(argv)));
+		GdbCommand cmd(CLIBypass(ARRAY_SIZE(argv), const_cast<char**>(argv)));
 		State->SyncCommand(cmd);
 	}
 
 	{
 		const char* argv[] = { "monitor", "itm", "ports", "on"};
-		GdbCommand cmd(CLIBypass(4, const_cast<char**>(argv)));
+		GdbCommand cmd(CLIBypass(ARRAY_SIZE(argv), const_cast<char**>(argv)));
 		State->SyncCommand(cmd);
 	}
 
@@ -127,6 +140,14 @@ void GdbConnection::Run()
 	LOG_DEBUG("Run");
 	GdbCommand cmd(MIExecContinue());
 	State->SyncCommand(cmd);
+}
+
+void GdbConnection::Stop()
+{
+    LOG_DEBUG("Stop");
+    GdbCommand cmd(MIExecInterrupt());
+    State->SyncCommand(cmd);
+    LOG_DEBUG("Stopped");
 }
 
 std::string GdbConnection::Evaluate(std::string expression)

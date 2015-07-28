@@ -1,8 +1,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
+#include <signal.h>
+#include <cassert>
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <thread>
+#include <fcntl.h>
 
 #include "TraceEvent.h"
 #include "TraceEventListener.h"
@@ -12,16 +16,39 @@
 
 #define DEFAULT_GDB "arm-none-eabi-gdb"
 
+class Pipe {
+public:
+    Pipe() throw(std::runtime_error);
+    ~Pipe();
+    int OpenForReading();
+    std::string GetName() const { return Name; }
+
+protected:
+    std::string Name;
+    int Fd;
+};
+
 class CortexWatch : public lct::TraceEventListener {
 public:
 	CortexWatch() { }
 	virtual ~CortexWatch();
 	int Run(std::string gdbPath, std::string elfPath,
 	        const std::vector<std::string>& watch);
+	void Exit();
+	void OpenPipe();
 
 	// interface TraceEventListener
 	void HandleTraceEvent(const lct::TraceEvent& event);
+
+protected:
+	bool TimeToExit;
+	int PipeFd;
+	std::unique_ptr<Pipe> TpiuPipe;
 };
+
+static CortexWatch s_cortexWatch;
+
+// -----------------------------------------------------------------
 
 CortexWatch::~CortexWatch()
 {
@@ -62,34 +89,45 @@ void CortexWatch::HandleTraceEvent(const lct::TraceEvent& event)
 	}
 }
 
+void CortexWatch::OpenPipe()
+{
+    PipeFd = TpiuPipe->OpenForReading();
+    LOG_DEBUG("Opened pipe stream");
+}
+
 int CortexWatch::Run(std::string gdbPath, std::string elfPath,
         const std::vector<std::string>& watch)
 {
+    TpiuPipe.reset(new Pipe);
+
 	lct::GdbConnection gdb;
 	lct::TraceFileParser tfp(*this);
-	std::string logpipe("/tmp/tpiu.log");
-	int fifores = mkfifo(logpipe.c_str(), 0644);
 
-	if (fifores != 0) {
-	    LOG_ERROR("Failed to create FIFO: %s", strerror(errno));
+	gdb.Connect(gdbPath, elfPath);
+	gdb.DisableTpiu();
+
+	const uint32_t dwt_ctrl = gdb.ReadWord(0xe0001000);
+
+	const size_t numcomp = dwt_ctrl >> 28;
+	LOG_DEBUG("%lu comparators on this chip", numcomp);
+
+	if (watch.size() > numcomp) {
+	    LOG_ERROR("Too many expressions, hardware only has %lu comparators",
+	            numcomp);
 	    return 1;
 	}
 
-	gdb.Connect(gdbPath, elfPath);
-	gdb.EnableTpiu(logpipe);
+	// We need to open the pipe for reading before telling OpenOCD to open it
+	// for writing. The open call will block until both ends are open, so we
+	// need to do let it block "in the background" here.
+	std::thread openthread([this](){ this->OpenPipe(); });
 
-	const uint32_t dwt_ctrl = gdb.ReadWord(0xe0001000);
-	const size_t numcomp = dwt_ctrl >> 28;
-
-	LOG_DEBUG("%lu comparators on this chip", numcomp);
+	LOG_DEBUG("Enable TPIU");
+	gdb.EnableTpiu(TpiuPipe->GetName());
 
 	size_t comp = 0;
 	for (auto expression : watch) {
-	    if (comp >= numcomp) {
-	        LOG_ERROR("Too many expressions, hardware only has %lu comparators",
-	                numcomp);
-	        return 1;
-	    }
+	    LOG_DEBUG("Setting watch");
 	    const size_t size = std::stoul(gdb.Evaluate(std::string("sizeof(") +
 	            expression + ")"));
 
@@ -104,18 +142,83 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
 
 	gdb.Run();
 
-	std::ifstream input;
-	input.open(logpipe);
-	while (!input.eof()) {
+	openthread.join();
+	LOG_DEBUG("Reading from pipe");
+	while (!TimeToExit) {
+	    timeval to = { 0, 100000 };
+	    fd_set readfd;
+	    FD_SET(PipeFd, &readfd);
+	    select(PipeFd + 1, &readfd, NULL, NULL, &to);
+
 		char buf[128];
-		input.read(buf, sizeof(buf));
-		const auto len = input.gcount();
-		// LOG_DEBUG("Read %lu bytes", len);
-		tfp.Feed(reinterpret_cast<const uint8_t*>(buf), len);
+		ssize_t readres = read(PipeFd, buf, sizeof(buf));
+		if (readres > 0) {
+		    // LOG_DEBUG("Read %ld bytes", readres);
+		    tfp.Feed(reinterpret_cast<const uint8_t*>(buf), readres);
+		}
+		else if (readres == -1) {
+		    if (errno != EAGAIN) {
+		        LOG_ERROR("Error when reading: %s", strerror(errno));
+		        break;
+		    }
+		}
 	}
+
+	LOG_INFO("Exiting");
+
+	gdb.Stop();
+	sleep(1);
+    gdb.DisableTpiu();
 
 	return 0;
 }
+
+void CortexWatch::Exit()
+{
+    TimeToExit = true;
+}
+
+// -----------------------------------------------------------------
+
+Pipe::Pipe() throw(std::runtime_error) :
+        Fd(-1)
+{
+    Name = "/tmp/tpiu.log";
+    int fifores = mkfifo(Name.c_str(), 0644);
+
+    if (fifores != 0) {
+        LOG_ERROR("Failed to create FIFO: %s", strerror(errno));
+        throw std::runtime_error(strerror(errno));
+    }
+}
+
+int Pipe::OpenForReading()
+{
+    assert(Fd == -1);
+    Fd = open(Name.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    if (Fd == -1) {
+        LOG_ERROR("Failed to open pipe: %s", strerror(errno));
+    }
+    return Fd;
+}
+
+Pipe::~Pipe()
+{
+    if (Fd == -1) {
+        return;
+    }
+
+    close(Fd);
+
+    LOG_DEBUG("Removing FIFO file");
+    int unlinkres = unlink(Name.c_str());
+
+    if (unlinkres != 0) {
+        LOG_WARNING("Failed to remove FIFO file");
+    }
+}
+
+// -----------------------------------------------------------------
 
 static void printHelp(const char* progname)
 {
@@ -131,6 +234,12 @@ static void printHelp(const char* progname)
             "       to prevent the shell from performing path expansion on it.\n"
             "\n",
             progname, DEFAULT_GDB);
+}
+
+static void termhandler(int)
+{
+    LOG_DEBUG("SIGTERM");
+    s_cortexWatch.Exit();
 }
 
 int main(int argc, char* argv[])
@@ -163,6 +272,10 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    CortexWatch t;
-	return t.Run(gdbPath, elfPath, watch);
+    struct sigaction act;
+    act.sa_handler = termhandler;
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT, &act, NULL);
+
+	return s_cortexWatch.Run(gdbPath, elfPath, watch);
 }

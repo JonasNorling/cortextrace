@@ -14,8 +14,10 @@ public:
 
 	void Connect(std::string gdb, std::string exec);
 	void SetExecutable(std::string elf);
+	void DisableTpiu();
 	void EnableTpiu(std::string logfile);
 	void Run();
+	void Stop();
 
 	uint32_t ReadWord(std::string expression, uint32_t* outAddress = NULL);
 	uint32_t ReadWord(uint32_t address);
