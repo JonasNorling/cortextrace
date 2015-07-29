@@ -19,35 +19,35 @@ class TraceEventListener;
  */
 class TraceFileParser {
 public:
-	TraceFileParser(TraceEventListener& listener);
-	virtual ~TraceFileParser();
+    TraceFileParser(TraceEventListener& listener);
+    virtual ~TraceFileParser();
 
-	void Feed(const uint8_t* data, size_t len);
+    void Feed(const uint8_t* data, size_t len);
 
 protected:
-	TraceEventListener& Listener;
+    TraceEventListener& Listener;
 
-	const uint8_t* CurrentData;
-	size_t CurrentLen;
-	size_t CurrentPtr;
+    const uint8_t* CurrentData;
+    size_t CurrentLen;
+    size_t CurrentPtr;
 
-	uint8_t OldData[10];
-	size_t OldLen;
-	size_t OldPtr;
+    uint8_t OldData[10];
+    size_t OldLen;
+    size_t OldPtr;
 
-	bool GetData(uint8_t* out, size_t count);
-	void PutBackData(size_t count);
+    bool GetData(uint8_t* out, size_t count);
+    void PutBackData(size_t count);
 
-	bool Parse();
-	bool ParseSync();
-	bool ParseTimeStamp(uint8_t b);
-	bool ParseInstrumentation(uint8_t b);
-	bool ParseHardwareSource(uint8_t b);
-	bool ParseUnhandledExtension(uint8_t b);
+    bool Parse();
+    bool ParseSync();
+    bool ParseTimeStamp(uint8_t b);
+    bool ParseInstrumentation(uint8_t b);
+    bool ParseHardwareSource(uint8_t b);
+    bool ParseUnhandledExtension(uint8_t b);
 
 private:
-	TraceFileParser(const TraceFileParser&);
-	TraceFileParser& operator=(const lct::TraceFileParser&);
+    TraceFileParser(const TraceFileParser&);
+    TraceFileParser& operator=(const lct::TraceFileParser&);
 };
 
 } /* namespace lct */

@@ -17,51 +17,51 @@ namespace lct {
 
 class GdbResult {
 public:
-	GdbResult(GdbResult&& o) = default;
-	static GdbResult FromResultRecord(MIResultRecord* rr);
-	static GdbResult FromList(MIList* list);
-	static GdbResult FromTuple(MIList* tuple);
+    GdbResult(GdbResult&& o) = default;
+    static GdbResult FromResultRecord(MIResultRecord* rr);
+    static GdbResult FromList(MIList* list);
+    static GdbResult FromTuple(MIList* tuple);
 
-	const GdbResult& operator[](std::string) const throw(std::out_of_range);
-	const GdbResult& operator[](size_t) const throw(std::out_of_range);
-	std::string Str() const throw(std::out_of_range);
+    const GdbResult& operator[](std::string) const throw(std::out_of_range);
+    const GdbResult& operator[](size_t) const throw(std::out_of_range);
+    std::string Str() const throw(std::out_of_range);
 
 private:
-	GdbResult(std::string);
-	GdbResult();
+    GdbResult(std::string);
+    GdbResult();
 
-	std::unique_ptr<std::vector<GdbResult>> List;
-	std::unique_ptr<std::unordered_multimap<std::string, GdbResult>> Tuple;
-	std::unique_ptr<std::string> String;
+    std::unique_ptr<std::vector<GdbResult>> List;
+    std::unique_ptr<std::unordered_multimap<std::string, GdbResult>> Tuple;
+    std::unique_ptr<std::string> String;
 };
 
 class GdbCommand {
 public:
-	GdbCommand(MICommand* cmd);
-	virtual ~GdbCommand();
-	operator MICommand*();
-	GdbResult Result();
+    GdbCommand(MICommand* cmd);
+    virtual ~GdbCommand();
+    operator MICommand*();
+    GdbResult Result();
 
 protected:
-	MICommand* Cmd;
+    MICommand* Cmd;
 
 private:
-	GdbCommand(const GdbCommand&);
-	GdbCommand& operator=(const GdbCommand&);
+    GdbCommand(const GdbCommand&);
+    GdbCommand& operator=(const GdbCommand&);
 };
 
 class GdbConnectionState {
 public:
-	GdbConnectionState();
-	virtual ~GdbConnectionState();
+    GdbConnectionState();
+    virtual ~GdbConnectionState();
 
-	bool SyncCommand(GdbCommand& cmd);
+    bool SyncCommand(GdbCommand& cmd);
 
-	MISession* Gdb;
+    MISession* Gdb;
 
 private:
-	GdbConnectionState(const GdbConnectionState&);
-	GdbConnectionState& operator=(const GdbConnectionState&);
+    GdbConnectionState(const GdbConnectionState&);
+    GdbConnectionState& operator=(const GdbConnectionState&);
 };
 
 } // namespace

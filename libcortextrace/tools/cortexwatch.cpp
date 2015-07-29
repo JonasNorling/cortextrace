@@ -32,20 +32,20 @@ protected:
 
 class CortexWatch : public lct::TraceEventListener {
 public:
-	CortexWatch() { }
-	virtual ~CortexWatch();
-	int Run(std::string gdbPath, std::string elfPath,
-	        const std::vector<std::string>& watch);
-	void Exit();
-	void OpenPipe();
+    CortexWatch() { }
+    virtual ~CortexWatch();
+    int Run(std::string gdbPath, std::string elfPath,
+            const std::vector<std::string>& watch);
+    void Exit();
+    void OpenPipe();
 
-	// interface TraceEventListener
-	void HandleTraceEvent(const lct::TraceEvent& event);
+    // interface TraceEventListener
+    void HandleTraceEvent(const lct::TraceEvent& event);
 
 protected:
-	bool TimeToExit;
-	int PipeFd;
-	std::unique_ptr<Pipe> TpiuPipe;
+    bool TimeToExit;
+    int PipeFd;
+    std::unique_ptr<Pipe> TpiuPipe;
 };
 
 static CortexWatch s_cortexWatch;
@@ -58,37 +58,37 @@ CortexWatch::~CortexWatch()
 
 void CortexWatch::HandleTraceEvent(const lct::TraceEvent& event)
 {
-	switch (event.Type) {
-	case lct::TraceEvent::TRACE_EVENT_INSTR:
-		std::cout << static_cast<char>(event.Value);
-		break;
-	case lct::TraceEvent::TRACE_EVENT_HW: {
-		const uint8_t discriminator = event.Code >> 3;
-		if (discriminator == 0x2) { // PC sample
-			std::cout << "PC: " << std::hex << event.Value << std::dec << std::endl;
-		}
-		else if ((discriminator & 0x19) == 0x08) { // PC trace
-			std::cout << "PC trace: " << std::hex << event.Value << std::dec << std::endl;
-		}
-		else if ((discriminator & 0x18) == 0x10) { // data trace
-			std::cout << "data trace: " << ((discriminator & 0x01) ? "W " : "R " )
-					<< std::hex << event.Value << std::dec << std::endl;
-		}
-		else {
-			std::cout << "HW event: " << std::hex << event.Code << ":" << event.Value << std::dec << std::endl;
-		}
-		break;
-	}
-	case lct::TraceEvent::TRACE_EVENT_OVERFLOW:
-		std::cout << "Overflow" << std::endl;
-		break;
-	case lct::TraceEvent::TRACE_EVENT_SYNC:
-		std::cout << "Sync" << std::endl;
-		break;
-	default:
-		std::cout << "Event " << event.Type << ", "
-		<< event.Code << ", " << event.Value << std::endl;
-	}
+    switch (event.Type) {
+    case lct::TraceEvent::TRACE_EVENT_INSTR:
+        std::cout << static_cast<char>(event.Value);
+        break;
+    case lct::TraceEvent::TRACE_EVENT_HW: {
+        const uint8_t discriminator = event.Code >> 3;
+        if (discriminator == 0x2) { // PC sample
+            std::cout << "PC: " << std::hex << event.Value << std::dec << std::endl;
+        }
+        else if ((discriminator & 0x19) == 0x08) { // PC trace
+            std::cout << "PC trace: " << std::hex << event.Value << std::dec << std::endl;
+        }
+        else if ((discriminator & 0x18) == 0x10) { // data trace
+            std::cout << "data trace: " << ((discriminator & 0x01) ? "W " : "R " )
+                    << std::hex << event.Value << std::dec << std::endl;
+        }
+        else {
+            std::cout << "HW event: " << std::hex << event.Code << ":" << event.Value << std::dec << std::endl;
+        }
+        break;
+    }
+    case lct::TraceEvent::TRACE_EVENT_OVERFLOW:
+        std::cout << "Overflow" << std::endl;
+        break;
+    case lct::TraceEvent::TRACE_EVENT_SYNC:
+        std::cout << "Sync" << std::endl;
+        break;
+    default:
+        std::cout << "Event " << event.Type << ", "
+        << event.Code << ", " << event.Value << std::endl;
+    }
 }
 
 void CortexWatch::OpenPipe()
@@ -102,105 +102,105 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
 {
     TpiuPipe.reset(new Pipe);
 
-	lct::GdbConnection gdb;
-	lct::TraceFileParser tfp(*this);
-	lct::Registers regs;
+    lct::GdbConnection gdb;
+    lct::TraceFileParser tfp(*this);
+    lct::Registers regs;
 
-	gdb.Connect(gdbPath, elfPath);
-	gdb.DisableTpiu();
+    gdb.Connect(gdbPath, elfPath);
+    gdb.DisableTpiu();
 
-	const uint32_t dwt_ctrl = gdb.ReadWord(0xe0001000);
+    const uint32_t dwt_ctrl = gdb.ReadWord(0xe0001000);
 
-	const size_t numcomp = dwt_ctrl >> 28;
-	LOG_DEBUG("%lu comparators on this chip", numcomp);
+    const size_t numcomp = dwt_ctrl >> 28;
+    LOG_DEBUG("%lu comparators on this chip", numcomp);
 
-	if (watch.size() > numcomp) {
-	    LOG_ERROR("Too many expressions, hardware only has %lu comparators",
-	            numcomp);
-	    return 1;
-	}
+    if (watch.size() > numcomp) {
+        LOG_ERROR("Too many expressions, hardware only has %lu comparators",
+                numcomp);
+        return 1;
+    }
 
-	if ((gdb.ReadWord(regs.ROMTPIU) & 0x3) != 0x3) {
-	    LOG_WARNING("No TPIU fitted, tracing will not work");
-	}
-	if ((gdb.ReadWord(regs.ROMDWT) & 0x3) != 0x3) {
-	    LOG_WARNING("No DWT fitted, tracing will not work");
-	}
+    if ((gdb.ReadWord(regs.ROMTPIU) & 0x3) != 0x3) {
+        LOG_WARNING("No TPIU fitted, tracing will not work");
+    }
+    if ((gdb.ReadWord(regs.ROMDWT) & 0x3) != 0x3) {
+        LOG_WARNING("No DWT fitted, tracing will not work");
+    }
 
-	LOG_INFO("CPU core has support for %s%s%s%s%s.",
-	        (gdb.ReadWord(regs.ROMDWT) & 0x3) == 0x3 ? "DWT " : "",
-	        (gdb.ReadWord(regs.ROMFPB) & 0x3) == 0x3 ? "FPB " : "",
-	        (gdb.ReadWord(regs.ROMITM) & 0x3) == 0x3 ? "ITM " : "",
-	        (gdb.ReadWord(regs.ROMTPIU) & 0x3) == 0x3 ? "TPIU " : "",
-	        (gdb.ReadWord(regs.ROMETM) & 0x3) == 0x3 ? "ETM " : "");
+    LOG_INFO("CPU core has support for %s%s%s%s%s.",
+            (gdb.ReadWord(regs.ROMDWT) & 0x3) == 0x3 ? "DWT " : "",
+            (gdb.ReadWord(regs.ROMFPB) & 0x3) == 0x3 ? "FPB " : "",
+            (gdb.ReadWord(regs.ROMITM) & 0x3) == 0x3 ? "ITM " : "",
+            (gdb.ReadWord(regs.ROMTPIU) & 0x3) == 0x3 ? "TPIU " : "",
+            (gdb.ReadWord(regs.ROMETM) & 0x3) == 0x3 ? "ETM " : "");
 
-	// We need to open the pipe for reading before telling OpenOCD to open it
-	// for writing. The open call will block until both ends are open, so we
-	// need to do let it block "in the background" here.
-	std::thread openthread([this](){ this->OpenPipe(); });
+    // We need to open the pipe for reading before telling OpenOCD to open it
+    // for writing. The open call will block until both ends are open, so we
+    // need to do let it block "in the background" here.
+    std::thread openthread([this](){ this->OpenPipe(); });
 
-	LOG_DEBUG("Enable TPIU");
-	gdb.EnableTpiu(TpiuPipe->GetName());
+    LOG_DEBUG("Enable TPIU");
+    gdb.EnableTpiu(TpiuPipe->GetName());
 
-	// Clear old watches
-	for (size_t comp = 0; comp < numcomp; comp++) {
+    // Clear old watches
+    for (size_t comp = 0; comp < numcomp; comp++) {
         gdb.WriteWord(regs.DWT_COMP[comp], 0);
         gdb.WriteWord(regs.DWT_MASK[comp], 0);
         gdb.WriteWord(regs.DWT_FUNCTION[comp], 0);
-	}
+    }
 
-	// Set up new watches
-	size_t comp = 0;
-	for (auto expression : watch) {
-	    LOG_DEBUG("Setting watch");
-	    const size_t size = std::stoul(gdb.Evaluate(std::string("sizeof(") +
-	            expression + ")"));
-	    const uint32_t addr = gdb.ResolveAddress(std::string("&(") + expression + ")");
+    // Set up new watches
+    size_t comp = 0;
+    for (auto expression : watch) {
+        LOG_DEBUG("Setting watch");
+        const size_t size = std::stoul(gdb.Evaluate(std::string("sizeof(") +
+                expression + ")"));
+        const uint32_t addr = gdb.ResolveAddress(std::string("&(") + expression + ")");
 
-	    const size_t masksize = log2(size);
-	    if (1 << masksize != size) {
-	        LOG_WARNING("Cannot watch region of size %lu, rounding down to %lu",
-	                size, 1UL << masksize);
-	    }
-	    gdb.WriteWord(regs.DWT_COMP[comp], addr);
-	    gdb.WriteWord(regs.DWT_MASK[comp], masksize);
-	    gdb.WriteWord(regs.DWT_FUNCTION[comp], 0x3);
-	    LOG_INFO("Watching %s at %#x, size %lu (%lu bit mask)",
-	            expression.c_str(), addr, size, masksize);
-	    comp++;
-	}
+        const size_t masksize = log2(size);
+        if (1 << masksize != size) {
+            LOG_WARNING("Cannot watch region of size %lu, rounding down to %lu",
+                    size, 1UL << masksize);
+        }
+        gdb.WriteWord(regs.DWT_COMP[comp], addr);
+        gdb.WriteWord(regs.DWT_MASK[comp], masksize);
+        gdb.WriteWord(regs.DWT_FUNCTION[comp], 0x3);
+        LOG_INFO("Watching %s at %#x, size %lu (%lu bit mask)",
+                expression.c_str(), addr, size, masksize);
+        comp++;
+    }
 
-	gdb.Run();
+    gdb.Run();
 
-	openthread.join();
-	LOG_DEBUG("Reading from pipe");
-	while (!TimeToExit) {
-	    timeval to = { 0, 100000 };
-	    fd_set readfd;
-	    FD_SET(PipeFd, &readfd);
-	    select(PipeFd + 1, &readfd, NULL, NULL, &to);
+    openthread.join();
+    LOG_DEBUG("Reading from pipe");
+    while (!TimeToExit) {
+        timeval to = { 0, 100000 };
+        fd_set readfd;
+        FD_SET(PipeFd, &readfd);
+        select(PipeFd + 1, &readfd, NULL, NULL, &to);
 
-		char buf[128];
-		ssize_t readres = read(PipeFd, buf, sizeof(buf));
-		if (readres > 0) {
-		    // LOG_DEBUG("Read %ld bytes", readres);
-		    tfp.Feed(reinterpret_cast<const uint8_t*>(buf), readres);
-		}
-		else if (readres == -1) {
-		    if (errno != EAGAIN) {
-		        LOG_ERROR("Error when reading: %s", strerror(errno));
-		        break;
-		    }
-		}
-	}
+        char buf[128];
+        ssize_t readres = read(PipeFd, buf, sizeof(buf));
+        if (readres > 0) {
+            // LOG_DEBUG("Read %ld bytes", readres);
+            tfp.Feed(reinterpret_cast<const uint8_t*>(buf), readres);
+        }
+        else if (readres == -1) {
+            if (errno != EAGAIN) {
+                LOG_ERROR("Error when reading: %s", strerror(errno));
+                break;
+            }
+        }
+    }
 
-	LOG_INFO("Exiting");
+    LOG_INFO("Exiting");
 
-	gdb.Stop();
-	sleep(1);
+    gdb.Stop();
+    sleep(1);
     gdb.DisableTpiu();
 
-	return 0;
+    return 0;
 }
 
 void CortexWatch::Exit()
@@ -307,5 +307,5 @@ int main(int argc, char* argv[])
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
 
-	return s_cortexWatch.Run(gdbPath, elfPath, watch);
+    return s_cortexWatch.Run(gdbPath, elfPath, watch);
 }

@@ -10,8 +10,8 @@ class TraceEvent;
 class TraceEventListener
 {
 public:
-	virtual ~TraceEventListener();
-	virtual void HandleTraceEvent(const TraceEvent& event) = 0;
+    virtual ~TraceEventListener();
+    virtual void HandleTraceEvent(const TraceEvent& event) = 0;
 };
 
 } /* namespace lct */

@@ -4,7 +4,7 @@ namespace lct {
 
 TraceEventListener::~TraceEventListener()
 {
-	// Oh gosh this is pointless
+    // Oh gosh this is pointless
 }
 
 }
