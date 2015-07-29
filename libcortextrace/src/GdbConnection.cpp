@@ -141,6 +141,12 @@ void GdbConnection::EnableTpiu(std::string logfile)
 	LOG_INFO("TPIU_SPPR: 0x%08x", ReadWord(regs.TPIU_SPPR));
 	LOG_INFO("TPIU_TYPE: 0x%08x", ReadWord(regs.TPIU_TYPE));
 
+	LOG_INFO("ROMDWT: 0x%08x", ReadWord(regs.ROMDWT));
+	LOG_INFO("ROMFPB: 0x%08x", ReadWord(regs.ROMFPB));
+	LOG_INFO("ROMITM: 0x%08x", ReadWord(regs.ROMITM));
+	LOG_INFO("ROMTPIU: 0x%08x", ReadWord(regs.ROMTPIU));
+	LOG_INFO("ROMETM: 0x%08x", ReadWord(regs.ROMETM));
+
 	LOG_INFO("DWT_CTRL: 0x%08x", ReadWord(regs.DWT_CTRL));
 	LOG_INFO("DWT_COMP[0]: 0x%08x", ReadWord(regs.DWT_COMP[0]));
 	LOG_INFO("DWT_MASK[0]: 0x%08x", ReadWord(regs.DWT_MASK[0]));

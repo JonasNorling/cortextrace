@@ -120,6 +120,20 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
 	    return 1;
 	}
 
+	if ((gdb.ReadWord(regs.ROMTPIU) & 0x3) != 0x3) {
+	    LOG_WARNING("No TPIU fitted, tracing will not work");
+	}
+	if ((gdb.ReadWord(regs.ROMDWT) & 0x3) != 0x3) {
+	    LOG_WARNING("No DWT fitted, tracing will not work");
+	}
+
+	LOG_INFO("CPU core has support for %s%s%s%s%s.",
+	        (gdb.ReadWord(regs.ROMDWT) & 0x3) == 0x3 ? "DWT " : "",
+	        (gdb.ReadWord(regs.ROMFPB) & 0x3) == 0x3 ? "FPB " : "",
+	        (gdb.ReadWord(regs.ROMITM) & 0x3) == 0x3 ? "ITM " : "",
+	        (gdb.ReadWord(regs.ROMTPIU) & 0x3) == 0x3 ? "TPIU " : "",
+	        (gdb.ReadWord(regs.ROMETM) & 0x3) == 0x3 ? "ETM " : "");
+
 	// We need to open the pipe for reading before telling OpenOCD to open it
 	// for writing. The open call will block until both ends are open, so we
 	// need to do let it block "in the background" here.

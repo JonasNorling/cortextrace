@@ -26,6 +26,12 @@ public:
     const RegisterArray DWT_MASK =           {0xe0001024, 16};
     const RegisterArray DWT_FUNCTION =       {0xe0001028, 16};
 
+    static const RegisterAddress ROMDWT =     0xe00ff004;
+    static const RegisterAddress ROMFPB =     0xe00ff008;
+    static const RegisterAddress ROMITM =     0xe00ff00c;
+    static const RegisterAddress ROMTPIU =    0xe00ff010;
+    static const RegisterAddress ROMETM =     0xe00ff014;
+
     static const RegisterAddress TPIU_SSPSR = 0xe0040000;
     static const RegisterAddress TPIU_ACPR =  0xe0040010;
     static const RegisterAddress TPIU_SPPR =  0xe00400f0;
