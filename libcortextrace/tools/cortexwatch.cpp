@@ -17,6 +17,8 @@
 #include "log.h"
 
 #define DEFAULT_GDB "arm-none-eabi-gdb"
+#define DEFAULT_GDB_TARGET "extended-remote :3333"
+#define DEFAULT_CORE_FREQ 72000000UL
 
 class Pipe {
 public:
@@ -34,7 +36,8 @@ class CortexWatch : public lct::TraceEventListener {
 public:
     CortexWatch() { }
     virtual ~CortexWatch();
-    int Run(std::string gdbPath, std::string elfPath,
+    int Run(std::string gdbPath, std::string gdbTarget,
+            std::string elfPath, size_t corefreq,
             const std::vector<std::string>& watch);
     void Exit();
     void OpenPipe();
@@ -97,7 +100,8 @@ void CortexWatch::OpenPipe()
     LOG_DEBUG("Opened pipe stream");
 }
 
-int CortexWatch::Run(std::string gdbPath, std::string elfPath,
+int CortexWatch::Run(std::string gdbPath, std::string gdbTarget,
+        std::string elfPath, size_t corefreq,
         const std::vector<std::string>& watch)
 {
     TpiuPipe.reset(new Pipe);
@@ -107,11 +111,20 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
     lct::Registers regs;
 
     gdb.Connect(gdbPath, elfPath);
+    gdb.TargetSelect(gdbTarget);
     gdb.DisableTpiu();
 
-    const uint32_t dwt_ctrl = gdb.ReadWord(0xe0001000);
+    const uint32_t cpuid = gdb.ReadWord(regs.CPUID);
+    const uint32_t partno = (cpuid >> 4) & 0xfff;
+    LOG_INFO("CPUID: %#x: %s %s%u r%up%u",
+            cpuid,
+            (cpuid >> 24) == 0x41 ? "ARM" : "unknown",
+            (partno & 0xc30) == 0xc20 ? "Cortex-M" : "unknown",
+            partno & 0x0f,
+            (cpuid >> 20) & 0xf,
+            cpuid & 0xf);
 
-    const size_t numcomp = dwt_ctrl >> 28;
+    const size_t numcomp = gdb.ReadWord(regs.DWT_CTRL) >> 28;
     LOG_DEBUG("%lu comparators on this chip", numcomp);
 
     if (watch.size() > numcomp) {
@@ -140,7 +153,7 @@ int CortexWatch::Run(std::string gdbPath, std::string elfPath,
     std::thread openthread([this](){ this->OpenPipe(); });
 
     LOG_DEBUG("Enable TPIU");
-    gdb.EnableTpiu(TpiuPipe->GetName());
+    gdb.EnableTpiu(TpiuPipe->GetName(), corefreq);
 
     // Clear old watches
     for (size_t comp = 0; comp < numcomp; comp++) {
@@ -256,6 +269,8 @@ static void printHelp(const char* progname)
             "  -h            Print this help text\n"
             "  -e PATH       Path to the ELF file to debug\n"
             "  -g PATH       Path to the GDB executable to use (%s)\n"
+            "  -t STRING     GDB target specifier (%s)\n"
+            "  -f HZ         CPU core frequency (%lu)\n"
             "  -w EXPRESSION C expression to watch, such as a variable or address\n"
             "       Variables can be specified by name, while memory addresses\n"
             "       should be given a type to indicate the size:\n"
@@ -263,7 +278,7 @@ static void printHelp(const char* progname)
             "       It is prudent to enclose the expression in single quotes\n"
             "       to prevent the shell from performing path expansion on it.\n"
             "\n",
-            progname, DEFAULT_GDB);
+            progname, DEFAULT_GDB, DEFAULT_GDB_TARGET, DEFAULT_CORE_FREQ);
 }
 
 static void termhandler(int)
@@ -275,17 +290,25 @@ static void termhandler(int)
 int main(int argc, char* argv[])
 {
     std::string gdbPath = DEFAULT_GDB;
+    std::string gdbTarget = DEFAULT_GDB_TARGET;
     std::string elfPath;
+    size_t corefreq = DEFAULT_CORE_FREQ;
     std::vector<std::string> watch;
 
     int c;
-    while ((c = getopt(argc, argv, "hg:e:w:")) != -1) {
+    while ((c = getopt(argc, argv, "hg:t:e:f:w:")) != -1) {
         switch (c) {
         case 'g':
             gdbPath = optarg;
             break;
+        case 't':
+            gdbTarget = optarg;
+            break;
         case 'e':
             elfPath = optarg;
+            break;
+        case 'f':
+            corefreq = std::stoul(optarg);
             break;
         case 'w':
             watch.push_back(optarg);
@@ -307,5 +330,5 @@ int main(int argc, char* argv[])
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
 
-    return s_cortexWatch.Run(gdbPath, elfPath, watch);
+    return s_cortexWatch.Run(gdbPath, gdbTarget, elfPath, corefreq, watch);
 }

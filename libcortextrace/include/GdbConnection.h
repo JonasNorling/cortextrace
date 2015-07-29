@@ -14,8 +14,9 @@ public:
 
     void Connect(std::string gdb, std::string exec);
     void SetExecutable(std::string elf);
+    void TargetSelect(std::string target);
     void DisableTpiu();
-    void EnableTpiu(std::string logfile);
+    void EnableTpiu(std::string logfile, size_t corefreq);
     void Run();
     void Stop();
 

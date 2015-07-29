@@ -90,13 +90,13 @@ void GdbConnection::Connect(std::string gdb, std::string exec)
         GdbCommand cmd(MIGDBSet(const_cast<char*>("confirm"), const_cast<char*>("off")));
         State->SyncCommand(cmd);
     }
+}
 
-    {
-        GdbCommand cmd(MICommandNew(const_cast<char*>("-target-select"), MIResultRecordCONNECTED));
-        MICommandAddOption(cmd, const_cast<char*>("remote"), NULL);
-        MICommandAddOption(cmd, const_cast<char*>(":3333"), NULL);
-        State->SyncCommand(cmd);
-    }
+void GdbConnection::TargetSelect(std::string target)
+{
+    GdbCommand cmd(MICommandNew(const_cast<char*>("-target-select"), MIResultRecordCONNECTED));
+    MICommandAddOption(cmd, const_cast<char*>(target.c_str()), NULL);
+    State->SyncCommand(cmd);
 }
 
 void GdbConnection::DisableTpiu()
@@ -106,11 +106,11 @@ void GdbConnection::DisableTpiu()
     State->SyncCommand(cmd);
 }
 
-void GdbConnection::EnableTpiu(std::string logfile)
+void GdbConnection::EnableTpiu(std::string logfile, size_t corefreq)
 {
     {
         const char* argv[] = { "monitor", "tpiu", "config", "internal",
-                logfile.c_str(), "uart", "off", "72000000" };
+                logfile.c_str(), "uart", "off", std::to_string(corefreq).c_str() };
         GdbCommand cmd(CLIBypass(ARRAY_SIZE(argv), const_cast<char**>(argv)));
         State->SyncCommand(cmd);
     }
@@ -120,37 +120,6 @@ void GdbConnection::EnableTpiu(std::string logfile)
         GdbCommand cmd(CLIBypass(ARRAY_SIZE(argv), const_cast<char**>(argv)));
         State->SyncCommand(cmd);
     }
-
-    Registers regs;
-
-    const uint32_t cpuid = ReadWord(regs.CPUID);
-    const uint32_t partno = (cpuid >> 4) & 0xfff;
-    LOG_INFO("CPUID: %#x: %s %s%u r%up%u",
-            cpuid,
-            (cpuid >> 24) == 0x41 ? "ARM" : "unknown",
-            (partno & 0xc30) == 0xc20 ? "Cortex-M" : "unknown",
-            partno & 0x0f,
-            (cpuid >> 20) & 0xf,
-            cpuid & 0xf);
-
-    LOG_INFO("DEMCR: 0x%08x", ReadWord(regs.DEMCR));
-    LOG_INFO("ITM_TER0: 0x%08x", ReadWord(regs.ITM_TER0));
-    LOG_INFO("ITM_TCR: 0x%08x", ReadWord(regs.ITM_TCR));
-    LOG_INFO("TPIU_SSPSR: 0x%08x", ReadWord(regs.TPIU_SSPSR));
-    LOG_INFO("TPIU_ACPR: 0x%08x", ReadWord(regs.TPIU_ACPR));
-    LOG_INFO("TPIU_SPPR: 0x%08x", ReadWord(regs.TPIU_SPPR));
-    LOG_INFO("TPIU_TYPE: 0x%08x", ReadWord(regs.TPIU_TYPE));
-
-    LOG_INFO("ROMDWT: 0x%08x", ReadWord(regs.ROMDWT));
-    LOG_INFO("ROMFPB: 0x%08x", ReadWord(regs.ROMFPB));
-    LOG_INFO("ROMITM: 0x%08x", ReadWord(regs.ROMITM));
-    LOG_INFO("ROMTPIU: 0x%08x", ReadWord(regs.ROMTPIU));
-    LOG_INFO("ROMETM: 0x%08x", ReadWord(regs.ROMETM));
-
-    LOG_INFO("DWT_CTRL: 0x%08x", ReadWord(regs.DWT_CTRL));
-    LOG_INFO("DWT_COMP[0]: 0x%08x", ReadWord(regs.DWT_COMP[0]));
-    LOG_INFO("DWT_MASK[0]: 0x%08x", ReadWord(regs.DWT_MASK[0]));
-    LOG_INFO("DWT_FUNCTION[0]: 0x%08x", ReadWord(regs.DWT_FUNCTION[0]));
 }
 
 void GdbConnection::Run()
