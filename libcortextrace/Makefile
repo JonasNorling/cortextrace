@@ -13,6 +13,7 @@ OBJS += $(LIB_OBJS)
 
 CFLAGS += -Werror -Wall -Wpedantic -Weffc++ -std=c++11 -g -O1
 CPPFLAGS += -Iinclude/ -Isrc/ -I3pp/
+LDFLAGS += -L $(BUILDDIR) -lpthread
 
 ifeq ($(shell uname), Darwin)
 LIBMI := libmi.dylib
@@ -32,7 +33,7 @@ test: $(BUILDDIR)/testTraceFileParser
 OBJS += $(BUILDDIR)/src/test/TestTraceFileParser.o
 $(BUILDDIR)/testTraceFileParser: $(BUILDDIR)/src/test/TestTraceFileParser.o $(BUILDDIR)/libcortextrace.a
 	@echo CXX $<
-	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace
+	@$(CXX) $(CFLAGS) -o $@ $< $(LDFLAGS) -lcortextrace
 
 # ---------------------------------------------------------------------
 
@@ -42,12 +43,12 @@ tools: $(BUILDDIR)/cortextrace $(BUILDDIR)/cortexwatch
 OBJS += $(BUILDDIR)/tools/cortextrace.o
 $(BUILDDIR)/cortextrace: $(BUILDDIR)/tools/cortextrace.o $(BUILDDIR)/libcortextrace.a
 	@echo CXX $@
-	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace
+	@$(CXX) $(CFLAGS) -o $@ $< $(LDFLAGS) -lcortextrace
 
 OBJS += $(BUILDDIR)/tools/cortexwatch.o
 $(BUILDDIR)/cortexwatch: $(BUILDDIR)/tools/cortexwatch.o $(BUILDDIR)/libcortextrace.a $(BUILDDIR)/$(LIBMI)
 	@echo CXX $@
-	@$(CXX) $(CFLAGS) -o $@ $< -L $(BUILDDIR) -lcortextrace -lmi
+	@$(CXX) $(CFLAGS) -o $@ $< $(LDFLAGS) -lcortextrace -lmi
 
 # ---------------------------------------------------------------------
 

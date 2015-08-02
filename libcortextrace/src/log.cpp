@@ -14,6 +14,7 @@ static const char* levelStr(LogLevel level)
     case INFO: return "info";
     case WARNING: return "warning";
     case ERROR: return "error";
+    default: return "";
     }
 }
 

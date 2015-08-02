@@ -8,6 +8,7 @@
 #include <thread>
 #include <fcntl.h>
 #include <cmath>
+#include <cstring>
 
 #include "Registers.h"
 #include "TraceEvent.h"
@@ -34,7 +35,7 @@ protected:
 
 class CortexWatch : public lct::TraceEventListener {
 public:
-    CortexWatch() { }
+    CortexWatch() : TimeToExit(false), PipeFd(-1), TpiuPipe() { }
     virtual ~CortexWatch();
     int Run(std::string gdbPath, std::string gdbTarget,
             std::string elfPath, size_t corefreq,
@@ -171,7 +172,7 @@ int CortexWatch::Run(std::string gdbPath, std::string gdbTarget,
         const uint32_t addr = gdb.ResolveAddress(std::string("&(") + expression + ")");
 
         const size_t masksize = log2(size);
-        if (1 << masksize != size) {
+        if (1U << masksize != size) {
             LOG_WARNING("Cannot watch region of size %lu, rounding down to %lu",
                     size, 1UL << masksize);
         }
@@ -224,7 +225,7 @@ void CortexWatch::Exit()
 // -----------------------------------------------------------------
 
 Pipe::Pipe() throw(std::runtime_error) :
-        Fd(-1)
+        Name(), Fd(-1)
 {
     Name = "/tmp/tpiu.log";
     int fifores = mkfifo(Name.c_str(), 0644);
